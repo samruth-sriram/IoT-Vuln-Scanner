@@ -4,10 +4,7 @@
     <meta charset="UTF-8">
     <title>Automated Vulnerability Scanner</title>
     <style>
-        * {
-            box-sizing: border-box;
-        }
-
+        * { box-sizing: border-box; }
         body {
             background-color: #121212;
             color: #e0e0e0;
@@ -15,14 +12,12 @@
             padding: 40px;
             margin: 0;
         }
-
         h1 {
             text-align: center;
             font-size: 2.5em;
             color: #00ffa2;
             margin-bottom: 40px;
         }
-
         .container {
             max-width: 800px;
             margin: 0 auto;
@@ -31,7 +26,6 @@
             border-radius: 12px;
             box-shadow: 0 0 15px rgba(0, 255, 162, 0.1);
         }
-
         label {
             font-weight: 600;
             display: block;
@@ -39,7 +33,6 @@
             margin-bottom: 5px;
             color: #c0ffc0;
         }
-
         select,
         input[type="text"] {
             width: 100%;
@@ -51,13 +44,11 @@
             font-size: 1em;
             transition: all 0.2s ease;
         }
-
         select:focus,
         input:focus {
             border-color: #00cc88;
             outline: none;
         }
-
         .button {
             background-color: #00ffa2;
             color: #121212;
@@ -70,11 +61,7 @@
             cursor: pointer;
             transition: background-color 0.3s ease;
         }
-
-        .button:hover {
-            background-color: #00cc88;
-        }
-
+        .button:hover { background-color: #00cc88; }
         pre,
         textarea {
             width: 100%;
@@ -91,20 +78,17 @@
             white-space: pre-wrap;
             overflow-y: auto;
         }
-
         .footer {
             margin-top: 40px;
             text-align: center;
             font-size: 0.9em;
             color: #888;
         }
-
         .spinner {
             animation: spin 1s linear infinite;
             display: inline-block;
             margin-right: 5px;
         }
-
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -112,72 +96,104 @@
     </style>
 </head>
 <body>
-    <h1>Automated Vulnerability Scanner</h1>
-    <div class="container">
+<h1>Automated Vulnerability Scanner</h1>
+<div class="container">
+    <label for="interface">Select Network Interface:</label>
+    <select id="interface"></select>
+    <button class="button" onclick="findDevices()">Find Connected Devices</button>
+    <pre id="deviceOutput">Devices will be shown here...</pre>
 
-        <label for="interface">Select Network Interface:</label>
-        <select id="interface"></select>
-        <button class="button" onclick="findDevices()">Find Connected Devices</button>
+    <label for="ip">Select IP to Scan:</label>
+    <select id="ip"></select>
+    <button class="button" onclick="scanIP()">Scan for Vulnerabilities</button>
 
-        <pre id="deviceOutput">Devices will be shown here...</pre>
+    <textarea id="scanResult" readonly>Vulnerability results will appear here...</textarea>
 
-        <label for="ip">Enter IP to Scan:</label>
-        <input type="text" id="ip" placeholder="e.g., 192.168.1.1">
-        <button class="button" onclick="scanIP()">Scan for Vulnerabilities</button>
+    <button class="button" onclick="autoNessusScan()">Generate Detailed Report (Nessus)</button>
+    <a id="autoReportLink" href="#" style="display:none;" class="button" download>Download Detailed Report</a>
+</div>
 
-        <textarea id="scanResult" readonly>Vulnerability results will appear here...</textarea>
+<div class="footer">
+    &copy; 2025 Automated Scanner. Crafted for Cybersecurity Enthusiasts 🛡️
+</div>
 
-    </div>
+<script>
+    async function fetchInterfaces() {
+        const res = await fetch('/interfaces');
+        const interfaces = await res.json();
+        const dropdown = document.getElementById('interface');
+        interfaces.forEach(iface => {
+            const opt = document.createElement('option');
+            opt.value = iface;
+            opt.innerText = iface;
+            dropdown.appendChild(opt);
+        });
+    }
 
-    <div class="footer">
-        &copy; 2025 Automated Scanner. Crafted for Cybersecurity Enthusiasts 🛡️
-    </div>
+    async function findDevices() {
+        const iface = document.getElementById('interface').value;
+        document.getElementById('deviceOutput').innerText = '🔍 Scanning for connected devices...';
+        const res = await fetch('/devices', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ interface: iface })
+        });
+        const data = await res.json();
+        document.getElementById('deviceOutput').innerText = data.output || data.error;
 
-    <script>
-        async function fetchInterfaces() {
-            const res = await fetch('/interfaces');
-            const interfaces = await res.json();
-            const dropdown = document.getElementById('interface');
-            interfaces.forEach(iface => {
-                const opt = document.createElement('option');
-                opt.value = iface;
-                opt.innerText = iface;
-                dropdown.appendChild(opt);
-            });
+        const ips = (data.output.match(/\d+\.\d+\.\d+\.\d+/g) || []);
+        const ipDropdown = document.getElementById('ip');
+        ipDropdown.innerHTML = '';
+        ips.forEach(ip => {
+            const opt = document.createElement('option');
+            opt.value = ip;
+            opt.innerText = ip;
+            ipDropdown.appendChild(opt);
+        });
+    }
+
+    async function scanIP() {
+        const ip = document.getElementById('ip').value;
+        document.getElementById('scanResult').value = '🔬 Scanning for vulnerabilities...';
+        const res = await fetch('/scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ip: ip })
+        });
+        const data = await res.json();
+        if (data.error) {
+            document.getElementById('scanResult').value = data.error;
+        } else {
+            document.getElementById('scanResult').value =
+                "=== Summary ===\n" + data.summary +
+                "\n\n=== Nmap Results ===\n" + data.nmap +
+                "\n\n=== CVEs Found ===\n" + data.cves.join("\n");
         }
+    }
 
-        async function findDevices() {
-            const iface = document.getElementById('interface').value;
-            document.getElementById('deviceOutput').innerText = '🔍 Scanning for connected devices...';
-            const res = await fetch('/devices', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ interface: iface })
-            });
-            const data = await res.json();
-            document.getElementById('deviceOutput').innerText = data.output || data.error;
+    async function autoNessusScan() {
+        const ip = document.getElementById('ip').value;
+        if (!ip) {
+            alert("Please select an IP address.");
+            return;
         }
-
-        async function scanIP() {
-            const ip = document.getElementById('ip').value;
-            document.getElementById('scanResult').value = '🔬 Scanning for vulnerabilities...';
-            const res = await fetch('/scan', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ip: ip })
-            });
-            const data = await res.json();
-            if (data.error) {
-                document.getElementById('scanResult').value = data.error;
-            } else {
-                document.getElementById('scanResult').value =
-                    "=== Nmap Results ===\n" + data.nmap +
-                    "\n\n=== CVEs Found ===\n" + data.cves.join("\n") +
-                    "\n\n=== Metasploit Output ===\n" + data.metasploit;
-            }
+        const res = await fetch('/auto_scan_report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ip: ip })
+        });
+        const data = await res.json();
+        if (data.download_url) {
+            const link = document.getElementById('autoReportLink');
+            link.href = data.download_url;
+            link.style.display = 'inline-block';
+            link.innerText = 'Download Detailed Report';
+        } else {
+            alert(data.error || 'Something went wrong while generating the report.');
         }
+    }
 
-        fetchInterfaces();
-    </script>
+    fetchInterfaces();
+</script>
 </body>
 </html>
